@@ -1,18 +1,21 @@
 // Google Apps Script endpoints
-const SCRIPT_ID = 'AKfycbzkt3glLvLeT4b9PxZEmOBQdR9ZJLZZWPHJZVXCAQm5NBMvIxWjJuF07b3cl0eVPLgYhw';
-const BASE_URL = `https://script.google.com/macros/s/${SCRIPT_ID}/exec`;
-
+const SCRIPT_BASE_URL = 'https://script.google.com/macros/s/AKfycbzkt3glLvLeT4b9PxZEmOBQdR9ZJLZZWPHJZVXCAQm5NBMvIxWjJuF07b3cl0eVPLgYhw/exec';
 const API_ENDPOINTS = {
-    getBooks: `${BASE_URL}?action=getBooks`,
-    getCategories: `${BASE_URL}?action=getCategories`,
-    getPassword: `${BASE_URL}?action=getPassword`,
-    postAction: BASE_URL
+    books: `${SCRIPT_BASE_URL}?action=books`,
+    categories: `${SCRIPT_BASE_URL}?action=categories`,
+    password: SCRIPT_BASE_URL
 };
 
 // DOM Elements
 const booksContainer = document.getElementById('booksContainer');
 const searchInput = document.getElementById('searchInput');
 const categoryFilter = document.getElementById('categoryFilter');
+
+// Admin page elements
+const addBookForm = document.getElementById('addBookForm');
+const addCategoryForm = document.getElementById('addCategoryForm');
+const categoriesList = document.getElementById('categoriesList');
+const booksList = document.getElementById('booksList');
 
 // Data storage
 let books = [];
@@ -21,10 +24,14 @@ let categories = [];
 // Fetch books from Google Sheets
 async function fetchBooks() {
     try {
-        const response = await fetch(API_ENDPOINTS.getBooks);
+        const response = await fetch(API_ENDPOINTS.books);
         const data = await response.json();
-        books = Array.isArray(data) ? data : [];
-        displayBooks(books);
+        if (Array.isArray(data)) {
+            books = data;
+            displayBooks(books);
+        } else {
+            console.error('Invalid books data format');
+        }
     } catch (error) {
         console.error('Error fetching books:', error);
     }
@@ -33,10 +40,17 @@ async function fetchBooks() {
 // Fetch categories from Google Sheets
 async function fetchCategories() {
     try {
-        const response = await fetch(API_ENDPOINTS.getCategories);
+        const response = await fetch(API_ENDPOINTS.categories);
         const data = await response.json();
-        categories = Array.isArray(data) ? data : [];
-        updateCategoryDropdowns();
+        if (Array.isArray(data)) {
+            categories = data;
+            updateCategoryDropdowns();
+            if (window.location.pathname.includes('admin.html')) {
+                displayCategoriesList();
+            }
+        } else {
+            console.error('Invalid categories data format');
+        }
     } catch (error) {
         console.error('Error fetching categories:', error);
     }
@@ -44,12 +58,13 @@ async function fetchCategories() {
 
 // Display books in the grid
 function displayBooks(booksToShow) {
-    if (!booksContainer) return;
+    const container = booksContainer || booksList;
+    if (!container) return;
     
-    booksContainer.innerHTML = '';
+    container.innerHTML = '';
     booksToShow.forEach(book => {
         const bookCard = createBookCard(book);
-        booksContainer.appendChild(bookCard);
+        container.appendChild(bookCard);
     });
 }
 
@@ -78,6 +93,22 @@ function createBookCard(book) {
     return card;
 }
 
+// Display categories list in admin panel
+function displayCategoriesList() {
+    if (!categoriesList) return;
+    
+    categoriesList.innerHTML = '';
+    categories.forEach(category => {
+        const categoryItem = document.createElement('div');
+        categoryItem.className = 'category-item';
+        categoryItem.innerHTML = `
+            <span>${category.name}</span>
+            <button onclick="deleteCategory('${category.id}')" class="delete-button">حذف</button>
+        `;
+        categoriesList.appendChild(categoryItem);
+    });
+}
+
 // Update category dropdowns
 function updateCategoryDropdowns() {
     const dropdowns = [categoryFilter];
@@ -87,7 +118,6 @@ function updateCategoryDropdowns() {
 
     dropdowns.forEach(dropdown => {
         if (!dropdown) return;
-        
         dropdown.innerHTML = '<option value="">اختر التصنيف</option>';
         categories.forEach(category => {
             const option = document.createElement('option');
@@ -100,10 +130,10 @@ function updateCategoryDropdowns() {
 
 // Search and filter functionality
 function filterBooks() {
+    const searchTerm = searchInput?.value.toLowerCase();
+    const selectedCategory = categoryFilter?.value;
+
     if (!searchInput || !categoryFilter) return;
-    
-    const searchTerm = searchInput.value.toLowerCase();
-    const selectedCategory = categoryFilter.value;
 
     const filteredBooks = books.filter(book => {
         const matchesSearch = book.name.toLowerCase().includes(searchTerm);
@@ -117,50 +147,61 @@ function filterBooks() {
 // Admin functionality
 if (window.location.pathname.includes('admin.html')) {
     // Add new book
-    document.getElementById('addBookForm')?.addEventListener('submit', async (e) => {
+    addBookForm?.addEventListener('submit', async (e) => {
         e.preventDefault();
         
-        const formData = new FormData(e.target);
-        const bookData = {
-            name: formData.get('bookName'),
-            price: formData.get('bookPrice'),
-            quantity: formData.get('bookQuantity'),
-            category: formData.get('bookCategory'),
-            image: formData.get('bookImage') ? await uploadImage(formData.get('bookImage')) : ''
-        };
+        const submitButton = addBookForm.querySelector('button[type="submit"]');
+        const originalButtonText = submitButton.textContent;
+        submitButton.textContent = 'جاري الإضافة...';
+        submitButton.disabled = true;
 
         try {
-            const response = await fetch(API_ENDPOINTS.postAction, {
+            const formData = {
+                name: document.getElementById('bookName').value,
+                price: document.getElementById('bookPrice').value,
+                quantity: document.getElementById('bookQuantity').value,
+                category: document.getElementById('bookCategory').value,
+                image: 'https://via.placeholder.com/200x300?text=No+Image' // Default image
+            };
+
+            const response = await fetch(API_ENDPOINTS.books, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     action: 'addBook',
-                    book: bookData
+                    book: formData
                 })
             });
-            
-            const result = await response.text();
-            if (result === 'success') {
+
+            const result = await response.json();
+            if (result === 'success' || result?.success) {
                 alert('تم إضافة الكتاب بنجاح');
-                e.target.reset();
+                addBookForm.reset();
                 await fetchBooks();
             } else {
-                throw new Error(result);
+                throw new Error(result.error || 'Failed to add book');
             }
         } catch (error) {
             console.error('Error adding book:', error);
-            alert('حدث خطأ أثناء إضافة الكتاب');
+            alert(`حدث خطأ أثناء إضافة الكتاب: ${error.message}`);
+        } finally {
+            submitButton.textContent = originalButtonText;
+            submitButton.disabled = false;
         }
     });
 
     // Add new category
-    document.getElementById('addCategoryForm')?.addEventListener('submit', async (e) => {
+    addCategoryForm?.addEventListener('submit', async (e) => {
         e.preventDefault();
         
-        const categoryName = document.getElementById('categoryName').value;
-        
+        const submitButton = addCategoryForm.querySelector('button[type="submit"]');
+        const originalButtonText = submitButton.textContent;
+        submitButton.textContent = 'جاري الإضافة...';
+        submitButton.disabled = true;
+
         try {
-            const response = await fetch(API_ENDPOINTS.postAction, {
+            const categoryName = document.getElementById('categoryName').value;
+            const response = await fetch(API_ENDPOINTS.categories, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -168,27 +209,30 @@ if (window.location.pathname.includes('admin.html')) {
                     category: { name: categoryName }
                 })
             });
-            
-            const result = await response.text();
-            if (result === 'success') {
+
+            const result = await response.json();
+            if (result === 'success' || result?.success) {
                 alert('تم إضافة التصنيف بنجاح');
-                e.target.reset();
+                addCategoryForm.reset();
                 await fetchCategories();
             } else {
-                throw new Error(result);
+                throw new Error(result.error || 'Failed to add category');
             }
         } catch (error) {
             console.error('Error adding category:', error);
-            alert('حدث خطأ أثناء إضافة التصنيف');
+            alert(`حدث خطأ أثناء إضافة التصنيف: ${error.message}`);
+        } finally {
+            submitButton.textContent = originalButtonText;
+            submitButton.disabled = false;
         }
     });
 
     // Delete book
     window.deleteBook = async function(bookId) {
         if (!confirm('هل أنت متأكد من حذف هذا الكتاب؟')) return;
-        
+
         try {
-            const response = await fetch(API_ENDPOINTS.postAction, {
+            const response = await fetch(API_ENDPOINTS.books, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -196,26 +240,26 @@ if (window.location.pathname.includes('admin.html')) {
                     bookId: bookId
                 })
             });
-            
-            const result = await response.text();
-            if (result === 'success') {
+
+            const result = await response.json();
+            if (result === 'success' || result?.success) {
                 alert('تم حذف الكتاب بنجاح');
                 await fetchBooks();
             } else {
-                throw new Error(result);
+                throw new Error(result.error || 'Failed to delete book');
             }
         } catch (error) {
             console.error('Error deleting book:', error);
-            alert('حدث خطأ أثناء حذف الكتاب');
+            alert(`حدث خطأ أثناء حذف الكتاب: ${error.message}`);
         }
-    };
+    }
 
     // Delete category
     window.deleteCategory = async function(categoryId) {
         if (!confirm('هل أنت متأكد من حذف هذا التصنيف؟')) return;
-        
+
         try {
-            const response = await fetch(API_ENDPOINTS.postAction, {
+            const response = await fetch(API_ENDPOINTS.categories, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -223,62 +267,103 @@ if (window.location.pathname.includes('admin.html')) {
                     categoryId: categoryId
                 })
             });
-            
-            const result = await response.text();
-            if (result === 'success') {
+
+            const result = await response.json();
+            if (result === 'success' || result?.success) {
                 alert('تم حذف التصنيف بنجاح');
                 await fetchCategories();
             } else {
-                throw new Error(result);
+                throw new Error(result.error || 'Failed to delete category');
             }
         } catch (error) {
             console.error('Error deleting category:', error);
-            alert('حدث خطأ أثناء حذف التصنيف');
+            alert(`حدث خطأ أثناء حذف التصنيف: ${error.message}`);
         }
-    };
+    }
+}
 
-    // Change password
-    document.getElementById('changePasswordForm')?.addEventListener('submit', async (e) => {
+// Password management
+async function getStoredPassword() {
+    try {
+        const response = await fetch(`${API_ENDPOINTS.password}?action=getPassword`);
+        const data = await response.json();
+        return data.password || '123456';
+    } catch (error) {
+        console.error('Error fetching password:', error);
+        return '123456';
+    }
+}
+
+async function updatePassword(currentPassword, newPassword) {
+    try {
+        const response = await fetch(API_ENDPOINTS.password, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'updatePassword',
+                current: currentPassword,
+                new: newPassword
+            })
+        });
+        const result = await response.json();
+        return result === 'success' || result?.success;
+    } catch (error) {
+        console.error('Error updating password:', error);
+        return false;
+    }
+}
+
+// Password change form handler
+if (document.getElementById('changePasswordForm')) {
+    const changePasswordForm = document.getElementById('changePasswordForm');
+    const successMessage = document.getElementById('passwordSuccessMessage');
+    const errorMessage = document.getElementById('passwordErrorMessage');
+
+    changePasswordForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        
         const currentPassword = document.getElementById('currentPassword').value;
         const newPassword = document.getElementById('newPassword').value;
-        
-        try {
-            const response = await fetch(API_ENDPOINTS.postAction, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    action: 'updatePassword',
-                    currentPassword: currentPassword,
-                    newPassword: newPassword
-                })
-            });
-            
-            const result = await response.text();
-            if (result === 'success') {
-                document.getElementById('passwordSuccessMessage').style.display = 'block';
-                document.getElementById('passwordErrorMessage').style.display = 'none';
-                e.target.reset();
-            } else {
-                document.getElementById('passwordErrorMessage').style.display = 'block';
-                document.getElementById('passwordSuccessMessage').style.display = 'none';
-            }
-        } catch (error) {
-            console.error('Error changing password:', error);
-            document.getElementById('passwordErrorMessage').style.display = 'block';
-            document.getElementById('passwordSuccessMessage').style.display = 'none';
+
+        successMessage.style.display = 'none';
+        errorMessage.style.display = 'none';
+
+        const updated = await updatePassword(currentPassword, newPassword);
+        if (updated) {
+            successMessage.style.display = 'block';
+            changePasswordForm.reset();
+        } else {
+            errorMessage.textContent = 'كلمة المرور الحالية غير صحيحة أو حدث خطأ أثناء تحديث كلمة المرور';
+            errorMessage.style.display = 'block';
+        }
+    });
+}
+
+// Login form handler
+if (document.getElementById('loginForm')) {
+    const loginForm = document.getElementById('loginForm');
+    const errorMessage = document.getElementById('errorMessage');
+
+    if (sessionStorage.getItem('authenticated') === 'true') {
+        window.location.href = 'admin.html';
+    }
+
+    loginForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const password = document.getElementById('password').value;
+        const correctPassword = await getStoredPassword();
+
+        if (password === correctPassword) {
+            sessionStorage.setItem('authenticated', 'true');
+            window.location.href = 'admin.html';
+        } else {
+            errorMessage.style.display = 'block';
+            loginForm.reset();
         }
     });
 }
 
 // Initial load
-if (booksContainer) {
+document.addEventListener('DOMContentLoaded', () => {
     fetchBooks();
     fetchCategories();
-}
-
-if (searchInput && categoryFilter) {
-    searchInput.addEventListener('input', filterBooks);
-    categoryFilter.addEventListener('change', filterBooks);
-}
+});

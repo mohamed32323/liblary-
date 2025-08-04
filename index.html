@@ -43,40 +43,7 @@
             </div>
         </div>
     </footer>
-    <script>
-        const loginForm = document.getElementById('loginForm');
-        const errorMessage = document.getElementById('errorMessage');
-        const PASSWORD_API_URL = 'https://script.google.com/macros/s/AKfycbzkt3glLvLeT4b9PxZEmOBQdR9ZJLZZWPHJZVXCAQm5NBMvIxWjJuF07b3cl0eVPLgYhw/exec?action=getPassword';
 
-        if (sessionStorage.getItem('authenticated') === 'true') {
-            window.location.href = 'admin.html';
-        }
-
-        async function getStoredPassword() {
-            try {
-                const response = await fetch(PASSWORD_API_URL);
-                const data = await response.json();
-                return data.password || '123456';
-            } catch (error) {
-                console.error('Error fetching password:', error);
-                return '123456';
-            }
-        }
-
-        loginForm.addEventListener('submit', async function(e) {
-            e.preventDefault();
-            const password = document.getElementById('password').value;
-            const correctPassword = await getStoredPassword();
-
-            if (password === correctPassword) {
-                sessionStorage.setItem('authenticated', 'true');
-                window.location.href = 'admin.html';
-            } else {
-                errorMessage.style.display = 'block';
-                loginForm.reset();
-            }
-        });
-    </script>
     <script src="script.js"></script>
 </body>
 

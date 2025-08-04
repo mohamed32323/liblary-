@@ -41,12 +41,8 @@
                         <div class="form-group">
                             <label for="bookCategory">التصنيف</label>
                             <select id="bookCategory" required>
-                                <!-- Categories will be loaded dynamically -->
+                                <option value="">اختر التصنيف</option>
                             </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="bookImage">صورة الكتاب</label>
-                            <input type="file" id="bookImage" accept="image/*" required>
                         </div>
                         <button type="submit">إضافة الكتاب</button>
                     </form>
@@ -100,16 +96,10 @@
     </main>
 
     <script>
-        // تحقق من المصادقة
+        // Check authentication
         if (sessionStorage.getItem('authenticated') !== 'true') {
             window.location.href = 'login.html';
         }
-
-        // تسجيل الخروج
-        document.getElementById('logoutButton').addEventListener('click', function() {
-            sessionStorage.removeItem('authenticated');
-            window.location.href = 'index.html';
-        });
     </script>
     <script src="script.js"></script>
 </body>

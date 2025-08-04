@@ -3,6 +3,8 @@
     --color-grey-dark: #666;
     --color-beige: #f5f2ee;
     --color-primary: #4a4a4a;
+    --color-danger: #dc3545;
+    --color-success: #28a745;
 }
 
 * {
@@ -40,6 +42,24 @@ h1 {
 .subtitle {
     color: var(--color-grey-dark);
     margin-bottom: 1rem;
+}
+
+.admin-link {
+    margin-top: 1rem;
+}
+
+.admin-button {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    background-color: var(--color-primary);
+    color: white;
+    text-decoration: none;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.admin-button:hover {
+    background-color: var(--color-grey-dark);
 }
 
 /* Search and Filter Styles */
@@ -142,6 +162,23 @@ button {
 
 button:hover {
     background-color: var(--color-primary);
+}
+
+.delete-button {
+    background-color: var(--color-danger);
+    margin-top: 0.5rem;
+}
+
+.delete-button:hover {
+    background-color: #c82333;
+}
+
+.category-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem;
+    border-bottom: 1px solid var(--color-grey-light);
 }
 
 /* Footer Styles */
