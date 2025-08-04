@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مكتبة الرحلة</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <header>
+        <div class="container">
+            <h1>مكتبة الرحلة</h1>
+            <p class="subtitle">بيع مستلزمات و كتب الدراسيه</p>
+            <div class="admin-link">
+                <a href="login.html" class="admin-button">خاص بي المكتبة</a>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <div class="container">
+            <div class="search-filter">
+                <input type="text" id="searchInput" placeholder="بحث...">
+                <select id="categoryFilter">
+                    <option value="">اختر التصنيف</option>
+                </select>
+            </div>
+
+            <div class="books-grid" id="booksContainer">
+                <!-- Books will be dynamically added here -->
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <div class="contact-info">
+                <p class="location">الموقع: شارع كذا كذا جنب كذا كذا</p>
+                <p class="phone">ارقام الاستفسار و التواصل: 01000000000 - 01000000000</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
