@@ -100,10 +100,16 @@
     </main>
 
     <script>
-        // Check authentication
+        // تحقق من المصادقة
         if (sessionStorage.getItem('authenticated') !== 'true') {
             window.location.href = 'login.html';
         }
+
+        // تسجيل الخروج
+        document.getElementById('logoutButton').addEventListener('click', function() {
+            sessionStorage.removeItem('authenticated');
+            window.location.href = 'index.html';
+        });
     </script>
     <script src="script.js"></script>
 </body>

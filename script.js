@@ -1,21 +1,18 @@
 // Google Apps Script endpoints
-const SCRIPT_BASE_URL = 'https://script.google.com/macros/s/AKfycbzkt3glLvLeT4b9PxZEmOBQdR9ZJLZZWPHJZVXCAQm5NBMvIxWjJuF07b3cl0eVPLgYhw/exec';
+const SCRIPT_ID = 'AKfycbzkt3glLvLeT4b9PxZEmOBQdR9ZJLZZWPHJZVXCAQm5NBMvIxWjJuF07b3cl0eVPLgYhw';
+const BASE_URL = `https://script.google.com/macros/s/${SCRIPT_ID}/exec`;
+
 const API_ENDPOINTS = {
-    books: `${SCRIPT_BASE_URL}?action=books`,
-    categories: `${SCRIPT_BASE_URL}?action=categories`,
-    password: SCRIPT_BASE_URL
+    getBooks: `${BASE_URL}?action=getBooks`,
+    getCategories: `${BASE_URL}?action=getCategories`,
+    getPassword: `${BASE_URL}?action=getPassword`,
+    postAction: BASE_URL
 };
 
 // DOM Elements
 const booksContainer = document.getElementById('booksContainer');
 const searchInput = document.getElementById('searchInput');
 const categoryFilter = document.getElementById('categoryFilter');
-
-// Admin page elements
-const addBookForm = document.getElementById('addBookForm');
-const addCategoryForm = document.getElementById('addCategoryForm');
-const categoriesList = document.getElementById('categoriesList');
-const booksList = document.getElementById('booksList');
 
 // Data storage
 let books = [];
@@ -24,14 +21,10 @@ let categories = [];
 // Fetch books from Google Sheets
 async function fetchBooks() {
     try {
-        const response = await fetch(API_ENDPOINTS.books);
+        const response = await fetch(API_ENDPOINTS.getBooks);
         const data = await response.json();
-        if (Array.isArray(data)) {
-            books = data;
-            displayBooks(books);
-        } else {
-            console.error('Invalid books data format');
-        }
+        books = Array.isArray(data) ? data : [];
+        displayBooks(books);
     } catch (error) {
         console.error('Error fetching books:', error);
     }
@@ -40,14 +33,10 @@ async function fetchBooks() {
 // Fetch categories from Google Sheets
 async function fetchCategories() {
     try {
-        const response = await fetch(API_ENDPOINTS.categories);
+        const response = await fetch(API_ENDPOINTS.getCategories);
         const data = await response.json();
-        if (Array.isArray(data)) {
-            categories = data;
-            updateCategoryDropdowns();
-        } else {
-            console.error('Invalid categories data format');
-        }
+        categories = Array.isArray(data) ? data : [];
+        updateCategoryDropdowns();
     } catch (error) {
         console.error('Error fetching categories:', error);
     }
@@ -55,6 +44,8 @@ async function fetchCategories() {
 
 // Display books in the grid
 function displayBooks(booksToShow) {
+    if (!booksContainer) return;
+    
     booksContainer.innerHTML = '';
     booksToShow.forEach(book => {
         const bookCard = createBookCard(book);
@@ -95,6 +86,8 @@ function updateCategoryDropdowns() {
     }
 
     dropdowns.forEach(dropdown => {
+        if (!dropdown) return;
+        
         dropdown.innerHTML = '<option value="">اختر التصنيف</option>';
         categories.forEach(category => {
             const option = document.createElement('option');
@@ -107,6 +100,8 @@ function updateCategoryDropdowns() {
 
 // Search and filter functionality
 function filterBooks() {
+    if (!searchInput || !categoryFilter) return;
+    
     const searchTerm = searchInput.value.toLowerCase();
     const selectedCategory = categoryFilter.value;
 
@@ -122,41 +117,32 @@ function filterBooks() {
 // Admin functionality
 if (window.location.pathname.includes('admin.html')) {
     // Add new book
-    addBookForm?.addEventListener('submit', async (e) => {
+    document.getElementById('addBookForm')?.addEventListener('submit', async (e) => {
         e.preventDefault();
         
-        // Show loading state
-        const submitButton = addBookForm.querySelector('button[type="submit"]');
-        const originalButtonText = submitButton.textContent;
-        submitButton.textContent = 'جاري الإضافة...';
-        submitButton.disabled = true;
+        const formData = new FormData(e.target);
+        const bookData = {
+            name: formData.get('bookName'),
+            price: formData.get('bookPrice'),
+            quantity: formData.get('bookQuantity'),
+            category: formData.get('bookCategory'),
+            image: formData.get('bookImage') ? await uploadImage(formData.get('bookImage')) : ''
+        };
 
         try {
-            const formData = new FormData(addBookForm);
-            const imageFile = formData.get('bookImage');
-            const imageUrl = await uploadImage(imageFile);
-
-            const bookData = {
-                action: 'addBook',
-                book: {
-                    name: formData.get('bookName'),
-                    price: formData.get('bookPrice'),
-                    quantity: formData.get('bookQuantity'),
-                    category: formData.get('bookCategory'),
-                    image: imageUrl
-                }
-            };
-
-            const response = await fetch(API_ENDPOINTS.books, {
+            const response = await fetch(API_ENDPOINTS.postAction, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(bookData)
+                body: JSON.stringify({
+                    action: 'addBook',
+                    book: bookData
+                })
             });
-
+            
             const result = await response.text();
             if (result === 'success') {
                 alert('تم إضافة الكتاب بنجاح');
-                addBookForm.reset();
+                e.target.reset();
                 await fetchBooks();
             } else {
                 throw new Error(result);
@@ -164,25 +150,17 @@ if (window.location.pathname.includes('admin.html')) {
         } catch (error) {
             console.error('Error adding book:', error);
             alert('حدث خطأ أثناء إضافة الكتاب');
-        } finally {
-            submitButton.textContent = originalButtonText;
-            submitButton.disabled = false;
         }
     });
 
     // Add new category
-    addCategoryForm?.addEventListener('submit', async (e) => {
+    document.getElementById('addCategoryForm')?.addEventListener('submit', async (e) => {
         e.preventDefault();
         
-        // Show loading state
-        const submitButton = addCategoryForm.querySelector('button[type="submit"]');
-        const originalButtonText = submitButton.textContent;
-        submitButton.textContent = 'جاري الإضافة...';
-        submitButton.disabled = true;
-
+        const categoryName = document.getElementById('categoryName').value;
+        
         try {
-            const categoryName = document.getElementById('categoryName').value;
-            const response = await fetch(API_ENDPOINTS.categories, {
+            const response = await fetch(API_ENDPOINTS.postAction, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -190,11 +168,11 @@ if (window.location.pathname.includes('admin.html')) {
                     category: { name: categoryName }
                 })
             });
-
+            
             const result = await response.text();
             if (result === 'success') {
                 alert('تم إضافة التصنيف بنجاح');
-                addCategoryForm.reset();
+                e.target.reset();
                 await fetchCategories();
             } else {
                 throw new Error(result);
@@ -202,20 +180,15 @@ if (window.location.pathname.includes('admin.html')) {
         } catch (error) {
             console.error('Error adding category:', error);
             alert('حدث خطأ أثناء إضافة التصنيف');
-        } finally {
-            submitButton.textContent = originalButtonText;
-            submitButton.disabled = false;
         }
     });
 
     // Delete book
-    async function deleteBook(bookId) {
-        if (!confirm('هل أنت متأكد من حذف هذا الكتاب؟')) {
-            return;
-        }
-
+    window.deleteBook = async function(bookId) {
+        if (!confirm('هل أنت متأكد من حذف هذا الكتاب؟')) return;
+        
         try {
-            const response = await fetch(API_ENDPOINTS.books, {
+            const response = await fetch(API_ENDPOINTS.postAction, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -223,7 +196,7 @@ if (window.location.pathname.includes('admin.html')) {
                     bookId: bookId
                 })
             });
-
+            
             const result = await response.text();
             if (result === 'success') {
                 alert('تم حذف الكتاب بنجاح');
@@ -235,16 +208,14 @@ if (window.location.pathname.includes('admin.html')) {
             console.error('Error deleting book:', error);
             alert('حدث خطأ أثناء حذف الكتاب');
         }
-    }
+    };
 
     // Delete category
-    async function deleteCategory(categoryId) {
-        if (!confirm('هل أنت متأكد من حذف هذا التصنيف؟')) {
-            return;
-        }
-
+    window.deleteCategory = async function(categoryId) {
+        if (!confirm('هل أنت متأكد من حذف هذا التصنيف؟')) return;
+        
         try {
-            const response = await fetch(API_ENDPOINTS.categories, {
+            const response = await fetch(API_ENDPOINTS.postAction, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -252,7 +223,7 @@ if (window.location.pathname.includes('admin.html')) {
                     categoryId: categoryId
                 })
             });
-
+            
             const result = await response.text();
             if (result === 'success') {
                 alert('تم حذف التصنيف بنجاح');
@@ -264,101 +235,50 @@ if (window.location.pathname.includes('admin.html')) {
             console.error('Error deleting category:', error);
             alert('حدث خطأ أثناء حذف التصنيف');
         }
-    }
+    };
 
-    // Helper function to upload images
-    async function uploadImage(file) {
-        if (!file) {
-            throw new Error('No file provided');
-        }
-
-        const formData = new FormData();
-        formData.append('action', 'uploadImage');
-        formData.append('image', file);
-
-        try {
-            const response = await fetch(API_ENDPOINTS.books, {
-                method: 'POST',
-                body: formData
-            });
-
-            const result = await response.text();
-            if (result.startsWith('http')) {
-                return result; // Return the image URL
-            } else {
-                throw new Error(result);
-            }
-        } catch (error) {
-            console.error('Error uploading image:', error);
-            throw error;
-        }
-    }
-}
-
-// Event listeners
-searchInput?.addEventListener('input', filterBooks);
-categoryFilter?.addEventListener('change', filterBooks);
-
-// Password management functions
-
-const PASSWORD_API_URL = 'https://script.google.com/macros/s/AKfycbzkt3glLvLeT4b9PxZEmOBQdR9ZJLZZWPHJZVXCAQm5NBMvIxWjJuF07b3cl0eVPLgYhw/exec';
-
-// Get password from Google Apps Script (GET)
-async function getStoredPassword() {
-    try {
-        const response = await fetch(PASSWORD_API_URL);
-        const data = await response.json();
-        // Expecting { password: "..." }
-        return data.password || '123456';
-    } catch (error) {
-        console.error('Error fetching password:', error);
-        return '123456';
-    }
-}
-
-// Update password via Google Apps Script (POST)
-async function updatePassword(currentPassword, newPassword) {
-    try {
-        const response = await fetch(PASSWORD_API_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ current: currentPassword, new: newPassword })
-        });
-        const result = await response.text();
-        return result === 'success';
-    } catch (error) {
-        console.error('Error updating password:', error);
-        return false;
-    }
-}
-
-// Password change form handler
-if (document.getElementById('changePasswordForm')) {
-    const changePasswordForm = document.getElementById('changePasswordForm');
-    const successMessage = document.getElementById('passwordSuccessMessage');
-    const errorMessage = document.getElementById('passwordErrorMessage');
-
-    changePasswordForm.addEventListener('submit', async (e) => {
+    // Change password
+    document.getElementById('changePasswordForm')?.addEventListener('submit', async (e) => {
         e.preventDefault();
+        
         const currentPassword = document.getElementById('currentPassword').value;
         const newPassword = document.getElementById('newPassword').value;
-
-        // Hide any previous messages
-        successMessage.style.display = 'none';
-        errorMessage.style.display = 'none';
-
-        // Update password via API
-        const updated = await updatePassword(currentPassword, newPassword);
-        if (updated) {
-            successMessage.style.display = 'block';
-            changePasswordForm.reset();
-        } else {
-            errorMessage.textContent = 'كلمة المرور الحالية غير صحيحة أو حدث خطأ أثناء تحديث كلمة المرور';
-            errorMessage.style.display = 'block';
+        
+        try {
+            const response = await fetch(API_ENDPOINTS.postAction, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'updatePassword',
+                    currentPassword: currentPassword,
+                    newPassword: newPassword
+                })
+            });
+            
+            const result = await response.text();
+            if (result === 'success') {
+                document.getElementById('passwordSuccessMessage').style.display = 'block';
+                document.getElementById('passwordErrorMessage').style.display = 'none';
+                e.target.reset();
+            } else {
+                document.getElementById('passwordErrorMessage').style.display = 'block';
+                document.getElementById('passwordSuccessMessage').style.display = 'none';
+            }
+        } catch (error) {
+            console.error('Error changing password:', error);
+            document.getElementById('passwordErrorMessage').style.display = 'block';
+            document.getElementById('passwordSuccessMessage').style.display = 'none';
         }
     });
 }
 
 // Initial load
-fetchBooks();
-fetchCategories();
+if (booksContainer) {
+    fetchBooks();
+    fetchCategories();
+}
+
+if (searchInput && categoryFilter) {
+    searchInput.addEventListener('input', filterBooks);
+    categoryFilter.addEventListener('change', filterBooks);
+}
