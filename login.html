@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تسجيل الدخول - مكتبة الرحلة</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .login-container {
+            max-width: 400px;
+            margin: 2rem auto;
+            padding: 2rem;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .login-form {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .error-message {
+            color: #dc3545;
+            margin-top: 1rem;
+            display: none;
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <div class="container">
+            <h1>مكتبة الرحلة</h1>
+            <p class="subtitle">تسجيل الدخول للوحة التحكم</p>
+            <div class="admin-link">
+                <a href="index.html" class="admin-button">الرجوع إلي المكتبة</a>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <div class="container">
+            <div class="login-container">
+                <form class="login-form" id="loginForm">
+                    <div class="form-group">
+                        <label for="password">كلمة المرور</label>
+                        <input type="password" id="password" required>
+                    </div>
+                    <button type="submit">دخول</button>
+                    <p class="error-message" id="errorMessage">كلمة المرور غير صحيحة</p>
+                </form>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const loginForm = document.getElementById('loginForm');
+        const errorMessage = document.getElementById('errorMessage');
+        const PASSWORD_API_URL = 'YOUR_SHEETDB_PASSWORD_API_URL'; // Use the same URL as in script.js
+
+        // Check if already authenticated
+        if (sessionStorage.getItem('authenticated') === 'true') {
+            window.location.href = 'admin.html';
+        }
+
+        // Get stored password from Google Sheets
+        async function getStoredPassword() {
+            try {
+                const response = await fetch(PASSWORD_API_URL);
+                const data = await response.json();
+                return data[0]?.password || '123456'; // Default password if none set
+            } catch (error) {
+                console.error('Error fetching password:', error);
+                return '123456'; // Fallback to default password
+            }
+        }
+
+        loginForm.addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const password = document.getElementById('password').value;
+            const correctPassword = await getStoredPassword();
+
+            if (password === correctPassword) {
+                // Set authentication in session storage
+                sessionStorage.setItem('authenticated', 'true');
+                window.location.href = 'admin.html';
+            } else {
+                errorMessage.style.display = 'block';
+                loginForm.reset();
+            }
+        });
+    </script>
+</body>
+
+</html>
