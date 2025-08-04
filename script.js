@@ -1,5 +1,10 @@
-// Replace with your actual SheetDB API endpoint
-const SHEET_API_URL = 'YOUR_SHEETDB_API_URL';
+// Google Apps Script endpoints
+const SCRIPT_BASE_URL = 'https://script.google.com/macros/s/AKfycbzkt3glLvLeT4b9PxZEmOBQdR9ZJLZZWPHJZVXCAQm5NBMvIxWjJuF07b3cl0eVPLgYhw/exec';
+const API_ENDPOINTS = {
+    books: `${SCRIPT_BASE_URL}?action=books`,
+    categories: `${SCRIPT_BASE_URL}?action=categories`,
+    password: SCRIPT_BASE_URL
+};
 
 // DOM Elements
 const booksContainer = document.getElementById('booksContainer');
@@ -19,10 +24,14 @@ let categories = [];
 // Fetch books from Google Sheets
 async function fetchBooks() {
     try {
-        const response = await fetch(SHEET_API_URL);
+        const response = await fetch(API_ENDPOINTS.books);
         const data = await response.json();
-        books = data;
-        displayBooks(books);
+        if (Array.isArray(data)) {
+            books = data;
+            displayBooks(books);
+        } else {
+            console.error('Invalid books data format');
+        }
     } catch (error) {
         console.error('Error fetching books:', error);
     }
@@ -31,10 +40,14 @@ async function fetchBooks() {
 // Fetch categories from Google Sheets
 async function fetchCategories() {
     try {
-        const response = await fetch(`${SHEET_API_URL}/categories`);
+        const response = await fetch(API_ENDPOINTS.categories);
         const data = await response.json();
-        categories = data;
-        updateCategoryDropdowns();
+        if (Array.isArray(data)) {
+            categories = data;
+            updateCategoryDropdowns();
+        } else {
+            console.error('Invalid categories data format');
+        }
     } catch (error) {
         console.error('Error fetching categories:', error);
     }
@@ -53,12 +66,22 @@ function displayBooks(booksToShow) {
 function createBookCard(book) {
     const card = document.createElement('div');
     card.className = 'book-card';
+    
+    const isAdminPage = window.location.pathname.includes('admin.html');
+    
     card.innerHTML = `
-        <img src="${book.image}" alt="${book.name}" class="book-image">
+        <img src="${book.image || 'placeholder-image.jpg'}" alt="${book.name}" class="book-image"
+             onerror="this.src='https://via.placeholder.com/200x300?text=No+Image'">
         <div class="book-info">
             <h3 class="book-title">${book.name}</h3>
             <p class="book-price">السعر: ${book.price}</p>
             <p class="book-quantity">الكمية: ${book.quantity}</p>
+            ${book.category ? `<p class="book-category">التصنيف: ${book.category}</p>` : ''}
+            ${isAdminPage ? `
+                <div class="book-actions">
+                    <button onclick="deleteBook('${book.id}')" class="delete-button">حذف</button>
+                </div>
+            ` : ''}
         </div>
     `;
     return card;
@@ -101,63 +124,112 @@ if (window.location.pathname.includes('admin.html')) {
     // Add new book
     addBookForm?.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const formData = new FormData(addBookForm);
-        const bookData = {
-            name: formData.get('bookName'),
-            price: formData.get('bookPrice'),
-            quantity: formData.get('bookQuantity'),
-            category: formData.get('bookCategory'),
-            image: await uploadImage(formData.get('bookImage'))
-        };
+        
+        // Show loading state
+        const submitButton = addBookForm.querySelector('button[type="submit"]');
+        const originalButtonText = submitButton.textContent;
+        submitButton.textContent = 'جاري الإضافة...';
+        submitButton.disabled = true;
 
         try {
-            const response = await fetch(SHEET_API_URL, {
+            const formData = new FormData(addBookForm);
+            const imageFile = formData.get('bookImage');
+            const imageUrl = await uploadImage(imageFile);
+
+            const bookData = {
+                action: 'addBook',
+                book: {
+                    name: formData.get('bookName'),
+                    price: formData.get('bookPrice'),
+                    quantity: formData.get('bookQuantity'),
+                    category: formData.get('bookCategory'),
+                    image: imageUrl
+                }
+            };
+
+            const response = await fetch(API_ENDPOINTS.books, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(bookData)
             });
-            if (response.ok) {
+
+            const result = await response.text();
+            if (result === 'success') {
                 alert('تم إضافة الكتاب بنجاح');
                 addBookForm.reset();
-                fetchBooks();
+                await fetchBooks();
+            } else {
+                throw new Error(result);
             }
         } catch (error) {
             console.error('Error adding book:', error);
             alert('حدث خطأ أثناء إضافة الكتاب');
+        } finally {
+            submitButton.textContent = originalButtonText;
+            submitButton.disabled = false;
         }
     });
 
     // Add new category
     addCategoryForm?.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const categoryName = document.getElementById('categoryName').value;
+        
+        // Show loading state
+        const submitButton = addCategoryForm.querySelector('button[type="submit"]');
+        const originalButtonText = submitButton.textContent;
+        submitButton.textContent = 'جاري الإضافة...';
+        submitButton.disabled = true;
 
         try {
-            const response = await fetch(`${SHEET_API_URL}/categories`, {
+            const categoryName = document.getElementById('categoryName').value;
+            const response = await fetch(API_ENDPOINTS.categories, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: categoryName })
+                body: JSON.stringify({
+                    action: 'addCategory',
+                    category: { name: categoryName }
+                })
             });
-            if (response.ok) {
+
+            const result = await response.text();
+            if (result === 'success') {
                 alert('تم إضافة التصنيف بنجاح');
                 addCategoryForm.reset();
-                fetchCategories();
+                await fetchCategories();
+            } else {
+                throw new Error(result);
             }
         } catch (error) {
             console.error('Error adding category:', error);
             alert('حدث خطأ أثناء إضافة التصنيف');
+        } finally {
+            submitButton.textContent = originalButtonText;
+            submitButton.disabled = false;
         }
     });
 
     // Delete book
     async function deleteBook(bookId) {
+        if (!confirm('هل أنت متأكد من حذف هذا الكتاب؟')) {
+            return;
+        }
+
         try {
-            const response = await fetch(`${SHEET_API_URL}/${bookId}`, {
-                method: 'DELETE'
+            const response = await fetch(API_ENDPOINTS.books, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'deleteBook',
+                    bookId: bookId
+                })
             });
-            if (response.ok) {
+
+            const result = await response.text();
+            if (result === 'success') {
                 alert('تم حذف الكتاب بنجاح');
-                fetchBooks();
+                await fetchBooks();
+            } else {
+                throw new Error(result);
             }
         } catch (error) {
             console.error('Error deleting book:', error);
@@ -167,13 +239,26 @@ if (window.location.pathname.includes('admin.html')) {
 
     // Delete category
     async function deleteCategory(categoryId) {
+        if (!confirm('هل أنت متأكد من حذف هذا التصنيف؟')) {
+            return;
+        }
+
         try {
-            const response = await fetch(`${SHEET_API_URL}/categories/${categoryId}`, {
-                method: 'DELETE'
+            const response = await fetch(API_ENDPOINTS.categories, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'deleteCategory',
+                    categoryId: categoryId
+                })
             });
-            if (response.ok) {
+
+            const result = await response.text();
+            if (result === 'success') {
                 alert('تم حذف التصنيف بنجاح');
-                fetchCategories();
+                await fetchCategories();
+            } else {
+                throw new Error(result);
             }
         } catch (error) {
             console.error('Error deleting category:', error);
@@ -181,11 +266,32 @@ if (window.location.pathname.includes('admin.html')) {
         }
     }
 
-    // Helper function to upload images (you'll need to implement this based on your chosen storage solution)
+    // Helper function to upload images
     async function uploadImage(file) {
-        // Implement image upload to your preferred storage service
-        // Return the URL of the uploaded image
-        return 'placeholder-image-url';
+        if (!file) {
+            throw new Error('No file provided');
+        }
+
+        const formData = new FormData();
+        formData.append('action', 'uploadImage');
+        formData.append('image', file);
+
+        try {
+            const response = await fetch(API_ENDPOINTS.books, {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.text();
+            if (result.startsWith('http')) {
+                return result; // Return the image URL
+            } else {
+                throw new Error(result);
+            }
+        } catch (error) {
+            console.error('Error uploading image:', error);
+            throw error;
+        }
     }
 }
 
