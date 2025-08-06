@@ -99,49 +99,11 @@ h1 {
     color: var(--color-grey-dark);
 }
 
-/* Admin Page Styles */
-.admin-page .container {
-    max-width: 800px;
-}
-
-.admin-panel section {
-    background: white;
-    border-radius: 8px;
-    padding: 2rem;
-    margin: 2rem 0;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.form-group {
-    margin-bottom: 1rem;
-}
-
-label {
-    display: block;
-    margin-bottom: 0.5rem;
-}
-
-input, select {
-    width: 100%;
-    padding: 0.5rem;
-    border: 1px solid var(--color-grey-dark);
-    border-radius: 4px;
-    font-family: 'Cairo', sans-serif;
-}
-
-button {
-    background-color: var(--color-grey-dark);
-    color: white;
-    padding: 0.5rem 1rem;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-family: 'Cairo', sans-serif;
-    transition: background-color 0.2s;
-}
-
-button:hover {
-    background-color: var(--color-primary);
+.no-books {
+    text-align: center;
+    padding: 20px;
+    grid-column: 1 / -1;
+    color: var(--color-grey-dark);
 }
 
 /* Footer Styles */
@@ -156,6 +118,26 @@ footer {
     color: var(--color-grey-dark);
 }
 
+/* Alert Styles */
+.alert {
+    padding: 15px;
+    margin-bottom: 20px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+}
+
+.alert-success {
+    color: #3c763d;
+    background-color: #dff0d8;
+    border-color: #d6e9c6;
+}
+
+.alert-error {
+    color: #a94442;
+    background-color: #f2dede;
+    border-color: #ebccd1;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     .search-filter {
@@ -166,4 +148,3 @@ footer {
         grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     }
 }
-

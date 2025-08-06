@@ -1,9 +1,9 @@
 // Google Apps Script endpoints
-const SCRIPT_BASE_URL = 'https://script.google.com/macros/s/AKfycbzkt3glLvLeT4b9PxZEmOBQdR9ZJLZZWPHJZVXCAQm5NBMvIxWjJuF07b3cl0eVPLgYhw/exec';
+const SCRIPT_BASE_URL = 'https://script.google.com/macros/s/AKfycbxfzSEupngDJW3RuTpcr_Wqm_w5DTjVrhjM5Uwyqa9a7MCNtVTYHUU_zLpTMfEuecYm9A/exec';
 const API_ENDPOINTS = {
     books: `${SCRIPT_BASE_URL}?action=books`,
     categories: `${SCRIPT_BASE_URL}?action=categories`,
-    password: SCRIPT_BASE_URL
+    password: `${SCRIPT_BASE_URL}?action=getPassword`
 };
 
 // DOM Elements
@@ -11,51 +11,112 @@ const booksContainer = document.getElementById('booksContainer');
 const searchInput = document.getElementById('searchInput');
 const categoryFilter = document.getElementById('categoryFilter');
 
-// Admin page elements
-const addBookForm = document.getElementById('addBookForm');
-const addCategoryForm = document.getElementById('addCategoryForm');
-const categoriesList = document.getElementById('categoriesList');
-const booksList = document.getElementById('booksList');
-
 // Data storage
 let books = [];
 let categories = [];
 
+// UI Elements
+const loader = document.createElement('div');
+loader.id = 'loader';
+loader.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+`;
+loader.innerHTML = `
+    <div class="spinner" style="
+        width: 50px;
+        height: 50px;
+        border: 5px solid #f3f3f3;
+        border-top: 5px solid #3498db;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    "></div>
+`;
+document.body.appendChild(loader);
+
 // Fetch books from Google Sheets
 async function fetchBooks() {
     try {
-        const response = await fetch(API_ENDPOINTS.books);
-        const data = await response.json();
-        if (Array.isArray(data)) {
-            books = data;
-            displayBooks(books);
-        } else {
-            console.error('Invalid books data format');
+        showLoading(true);
+        const response = await fetch(API_ENDPOINTS.books, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+            mode: 'cors'
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
+        
+        const data = await response.json();
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        books = Array.isArray(data.data) ? data.data : [];
+        displayBooks(books);
     } catch (error) {
-        console.error('Error fetching books:', error);
+        console.error('Fetch books error:', error);
+        books = [];
+        displayBooks(books);
+        showAlert('فشل تحميل البيانات. يرجى التحقق من اتصال الإنترنت والمحاولة لاحقاً.', 'error');
+    } finally {
+        showLoading(false);
     }
 }
 
 // Fetch categories from Google Sheets
 async function fetchCategories() {
     try {
-        const response = await fetch(API_ENDPOINTS.categories);
-        const data = await response.json();
-        if (Array.isArray(data)) {
-            categories = data;
-            updateCategoryDropdowns();
-        } else {
-            console.error('Invalid categories data format');
+        showLoading(true);
+        const response = await fetch(API_ENDPOINTS.categories, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+            mode: 'cors'
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
+        
+        const data = await response.json();
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        categories = Array.isArray(data.data) ? data.data : [];
+        updateCategoryDropdowns();
     } catch (error) {
-        console.error('Error fetching categories:', error);
+        console.error('Fetch categories error:', error);
+        categories = [];
+        updateCategoryDropdowns();
+        showAlert('فشل تحميل التصنيفات. يرجى المحاولة لاحقاً.', 'error');
+    } finally {
+        showLoading(false);
     }
 }
 
 // Display books in the grid
 function displayBooks(booksToShow) {
+    if (!booksContainer) return;
+    
     booksContainer.innerHTML = '';
+    
+    if (booksToShow.length === 0) {
+        booksContainer.innerHTML = '<p class="no-books">لا توجد كتب متاحة</p>';
+        return;
+    }
+    
     booksToShow.forEach(book => {
         const bookCard = createBookCard(book);
         booksContainer.appendChild(bookCard);
@@ -70,11 +131,13 @@ function createBookCard(book) {
     const isAdminPage = window.location.pathname.includes('admin.html');
     
     card.innerHTML = `
-        <img src="${book.image || 'placeholder-image.jpg'}" alt="${book.name}" class="book-image"
+        <img src="${book.image || 'https://via.placeholder.com/200x300?text=No+Image'}" 
+             alt="${book.name}" 
+             class="book-image"
              onerror="this.src='https://via.placeholder.com/200x300?text=No+Image'">
         <div class="book-info">
             <h3 class="book-title">${book.name}</h3>
-            <p class="book-price">السعر: ${book.price}</p>
+            <p class="book-price">السعر: ${book.price} ج.م</p>
             <p class="book-quantity">الكمية: ${book.quantity}</p>
             ${book.category ? `<p class="book-category">التصنيف: ${book.category}</p>` : ''}
             ${isAdminPage ? `
@@ -95,6 +158,8 @@ function updateCategoryDropdowns() {
     }
 
     dropdowns.forEach(dropdown => {
+        if (!dropdown) return;
+        
         dropdown.innerHTML = '<option value="">اختر التصنيف</option>';
         categories.forEach(category => {
             const option = document.createElement('option');
@@ -108,7 +173,7 @@ function updateCategoryDropdowns() {
 // Search and filter functionality
 function filterBooks() {
     const searchTerm = searchInput.value.toLowerCase();
-    const selectedCategory = categoryFilter.value;
+    const selectedCategory = categoryFilter ? categoryFilter.value : '';
 
     const filteredBooks = books.filter(book => {
         const matchesSearch = book.name.toLowerCase().includes(searchTerm);
@@ -122,19 +187,26 @@ function filterBooks() {
 // Admin functionality
 if (window.location.pathname.includes('admin.html')) {
     // Add new book
-    addBookForm?.addEventListener('submit', async (e) => {
+    document.getElementById('addBookForm')?.addEventListener('submit', async (e) => {
         e.preventDefault();
         
-        // Show loading state
-        const submitButton = addBookForm.querySelector('button[type="submit"]');
+        const form = e.target;
+        const submitButton = form.querySelector('button[type="submit"]');
         const originalButtonText = submitButton.textContent;
         submitButton.textContent = 'جاري الإضافة...';
         submitButton.disabled = true;
-
+        
         try {
-            const formData = new FormData(addBookForm);
-            const imageFile = formData.get('bookImage');
-            const imageUrl = await uploadImage(imageFile);
+            const formData = new FormData(form);
+            const imageFile = form.querySelector('#bookImage').files[0];
+            let imageUrl = '';
+
+            if (imageFile) {
+                imageUrl = await uploadImage(imageFile);
+                if (!imageUrl) {
+                    throw new Error('فشل رفع الصورة');
+                }
+            }
 
             const bookData = {
                 action: 'addBook',
@@ -147,23 +219,23 @@ if (window.location.pathname.includes('admin.html')) {
                 }
             };
 
-            const response = await fetch(API_ENDPOINTS.books, {
+            const response = await fetch(SCRIPT_BASE_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(bookData)
             });
 
-            const result = await response.text();
-            if (result === 'success') {
-                alert('تم إضافة الكتاب بنجاح');
-                addBookForm.reset();
+            const result = await response.json();
+            if (result.status === 'success') {
+                showAlert('تم إضافة الكتاب بنجاح', 'success');
+                form.reset();
                 await fetchBooks();
             } else {
-                throw new Error(result);
+                throw new Error(result.error || 'Failed to add book');
             }
         } catch (error) {
             console.error('Error adding book:', error);
-            alert('حدث خطأ أثناء إضافة الكتاب');
+            showAlert('حدث خطأ أثناء إضافة الكتاب: ' + error.message, 'error');
         } finally {
             submitButton.textContent = originalButtonText;
             submitButton.disabled = false;
@@ -171,18 +243,22 @@ if (window.location.pathname.includes('admin.html')) {
     });
 
     // Add new category
-    addCategoryForm?.addEventListener('submit', async (e) => {
+    document.getElementById('addCategoryForm')?.addEventListener('submit', async (e) => {
         e.preventDefault();
         
-        // Show loading state
-        const submitButton = addCategoryForm.querySelector('button[type="submit"]');
+        const form = e.target;
+        const submitButton = form.querySelector('button[type="submit"]');
         const originalButtonText = submitButton.textContent;
         submitButton.textContent = 'جاري الإضافة...';
         submitButton.disabled = true;
 
         try {
-            const categoryName = document.getElementById('categoryName').value;
-            const response = await fetch(API_ENDPOINTS.categories, {
+            const categoryName = document.getElementById('categoryName').value.trim();
+            if (!categoryName) {
+                throw new Error('اسم التصنيف مطلوب');
+            }
+
+            const response = await fetch(SCRIPT_BASE_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -191,17 +267,17 @@ if (window.location.pathname.includes('admin.html')) {
                 })
             });
 
-            const result = await response.text();
-            if (result === 'success') {
-                alert('تم إضافة التصنيف بنجاح');
-                addCategoryForm.reset();
+            const result = await response.json();
+            if (result.status === 'success') {
+                showAlert('تم إضافة التصنيف بنجاح', 'success');
+                form.reset();
                 await fetchCategories();
             } else {
-                throw new Error(result);
+                throw new Error(result.error || 'Failed to add category');
             }
         } catch (error) {
             console.error('Error adding category:', error);
-            alert('حدث خطأ أثناء إضافة التصنيف');
+            showAlert('حدث خطأ أثناء إضافة التصنيف: ' + error.message, 'error');
         } finally {
             submitButton.textContent = originalButtonText;
             submitButton.disabled = false;
@@ -209,13 +285,14 @@ if (window.location.pathname.includes('admin.html')) {
     });
 
     // Delete book
-    async function deleteBook(bookId) {
+    window.deleteBook = async function(bookId) {
         if (!confirm('هل أنت متأكد من حذف هذا الكتاب؟')) {
             return;
         }
 
         try {
-            const response = await fetch(API_ENDPOINTS.books, {
+            showLoading(true);
+            const response = await fetch(SCRIPT_BASE_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -224,27 +301,30 @@ if (window.location.pathname.includes('admin.html')) {
                 })
             });
 
-            const result = await response.text();
-            if (result === 'success') {
-                alert('تم حذف الكتاب بنجاح');
+            const result = await response.json();
+            if (result.status === 'success') {
+                showAlert('تم حذف الكتاب بنجاح', 'success');
                 await fetchBooks();
             } else {
-                throw new Error(result);
+                throw new Error(result.error || 'Failed to delete book');
             }
         } catch (error) {
             console.error('Error deleting book:', error);
-            alert('حدث خطأ أثناء حذف الكتاب');
+            showAlert('حدث خطأ أثناء حذف الكتاب: ' + error.message, 'error');
+        } finally {
+            showLoading(false);
         }
     }
 
     // Delete category
-    async function deleteCategory(categoryId) {
-        if (!confirm('هل أنت متأكد من حذف هذا التصنيف؟')) {
+    window.deleteCategory = async function(categoryId) {
+        if (!confirm('هل أنت متأكد من حذف هذا التصنيف؟ سيتم حذف جميع الكتب المرتبطة به.')) {
             return;
         }
 
         try {
-            const response = await fetch(API_ENDPOINTS.categories, {
+            showLoading(true);
+            const response = await fetch(SCRIPT_BASE_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -253,62 +333,65 @@ if (window.location.pathname.includes('admin.html')) {
                 })
             });
 
-            const result = await response.text();
-            if (result === 'success') {
-                alert('تم حذف التصنيف بنجاح');
+            const result = await response.json();
+            if (result.status === 'success') {
+                showAlert('تم حذف التصنيف بنجاح', 'success');
                 await fetchCategories();
+                await fetchBooks();
             } else {
-                throw new Error(result);
+                throw new Error(result.error || 'Failed to delete category');
             }
         } catch (error) {
             console.error('Error deleting category:', error);
-            alert('حدث خطأ أثناء حذف التصنيف');
+            showAlert('حدث خطأ أثناء حذف التصنيف: ' + error.message, 'error');
+        } finally {
+            showLoading(false);
         }
     }
 
     // Helper function to upload images
     async function uploadImage(file) {
-        if (!file) {
-            throw new Error('No file provided');
-        }
-
-        const formData = new FormData();
-        formData.append('action', 'uploadImage');
-        formData.append('image', file);
-
         try {
-            const response = await fetch(API_ENDPOINTS.books, {
+            showLoading(true);
+            const formData = new FormData();
+            formData.append('action', 'uploadImage');
+            formData.append('image', file);
+
+            const response = await fetch(SCRIPT_BASE_URL, {
                 method: 'POST',
                 body: formData
             });
 
-            const result = await response.text();
-            if (result.startsWith('http')) {
-                return result; // Return the image URL
+            const result = await response.json();
+            if (result.url) {
+                return result.url;
             } else {
-                throw new Error(result);
+                throw new Error(result.error || 'Failed to upload image');
             }
         } catch (error) {
             console.error('Error uploading image:', error);
-            throw error;
+            showAlert('حدث خطأ أثناء رفع الصورة: ' + error.message, 'error');
+            return null;
+        } finally {
+            showLoading(false);
         }
     }
 }
 
-// Event listeners
-searchInput?.addEventListener('input', filterBooks);
-categoryFilter?.addEventListener('change', filterBooks);
-
 // Password management functions
-
-const PASSWORD_API_URL = 'https://script.google.com/macros/s/AKfycbzkt3glLvLeT4b9PxZEmOBQdR9ZJLZZWPHJZVXCAQm5NBMvIxWjJuF07b3cl0eVPLgYhw/exec';
-
-// Get password from Google Apps Script (GET)
 async function getStoredPassword() {
     try {
-        const response = await fetch(PASSWORD_API_URL);
+        const response = await fetch(API_ENDPOINTS.password, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+            mode: 'cors'
+        });
+        
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+        
         const data = await response.json();
-        // Expecting { password: "..." }
         return data.password || '123456';
     } catch (error) {
         console.error('Error fetching password:', error);
@@ -316,19 +399,26 @@ async function getStoredPassword() {
     }
 }
 
-// Update password via Google Apps Script (POST)
 async function updatePassword(currentPassword, newPassword) {
     try {
-        const response = await fetch(PASSWORD_API_URL, {
+        showLoading(true);
+        const response = await fetch(SCRIPT_BASE_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ current: currentPassword, new: newPassword })
+            body: JSON.stringify({
+                action: 'updatePassword',
+                current: currentPassword,
+                new: newPassword
+            })
         });
-        const result = await response.text();
-        return result === 'success';
+        
+        const result = await response.json();
+        return result.status === 'success';
     } catch (error) {
         console.error('Error updating password:', error);
         return false;
+    } finally {
+        showLoading(false);
     }
 }
 
@@ -359,6 +449,57 @@ if (document.getElementById('changePasswordForm')) {
     });
 }
 
+// UI Helper functions
+function showLoading(show) {
+    const loader = document.getElementById('loader');
+    if (loader) {
+        loader.style.display = show ? 'flex' : 'none';
+    }
+}
+
+function showAlert(message, type) {
+    const alertContainer = document.getElementById('alert-container') || createAlertContainer();
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type}`;
+    alertDiv.textContent = message;
+    
+    alertContainer.appendChild(alertDiv);
+    
+    setTimeout(() => alertDiv.remove(), 5000);
+}
+
+function createAlertContainer() {
+    const container = document.createElement('div');
+    container.id = 'alert-container';
+    container.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 1000;
+        max-width: 400px;
+    `;
+    document.body.appendChild(container);
+    return container;
+}
+
+// Event listeners
+if (searchInput) searchInput.addEventListener('input', filterBooks);
+if (categoryFilter) categoryFilter.addEventListener('change', filterBooks);
+
 // Initial load
-fetchBooks();
-fetchCategories();
+document.addEventListener('DOMContentLoaded', () => {
+    // Check authentication for admin pages
+    if (window.location.pathname.includes('admin.html')) {
+        if (!localStorage.getItem('libraryAuthToken')) {
+            window.location.href = 'login.html';
+            return;
+        }
+    }
+
+    fetchBooks();
+    fetchCategories();
+});
+
+// Global functions for HTML event handlers
+window.deleteBook = window.deleteBook || function() {};
+window.deleteCategory = window.deleteCategory || function() {};
