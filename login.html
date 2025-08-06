@@ -4,7 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>تسجيل الدخول - مكتبة الرحلة</title>
+    <title>تسجيل الدخول - اعدادات مكتبة الرحلة</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-LN+7fdVzj6u52u30Kp6M/trliBMCMKTyK833zpbD+pXdCLuTusPj697FH4R/5mcr" crossorigin="anonymous">
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <style>
@@ -38,7 +40,7 @@
             <h1>مكتبة الرحلة</h1>
             <p class="subtitle">تسجيل الدخول للوحة التحكم</p>
             <div class="admin-link">
-                <a href="index.html" class="admin-button">الرجوع إلي المكتبة</a>
+                <a href="index.html" type="button" class="btn btn-dark">الرجوع إلي المكتبة</a>
             </div>
         </div>
     </header>
@@ -58,7 +60,43 @@
         </div>
     </main>
 
-    <script src="script.js"></script>
+    <script>
+        const loginForm = document.getElementById('loginForm');
+        const errorMessage = document.getElementById('errorMessage');
+        const PASSWORD_API_URL = 'https://script.google.com/macros/s/AKfycbzkt3glLvLeT4b9PxZEmOBQdR9ZJLZZWPHJZVXCAQm5NBMvIxWjJuF07b3cl0eVPLgYhw/exec'; // Use the same URL as in script.js YOUR_SHEETDB_PASSWORD_API_URL
+
+        // Check if already authenticated
+        if (sessionStorage.getItem('authenticated') === 'true') {
+            window.location.href = 'admin.html';
+        }
+
+        // Get stored password from Google Sheets
+        async function getStoredPassword() {
+            try {
+                const response = await fetch(PASSWORD_API_URL);
+                const data = await response.json();
+                return data[0]?.password || '123456'; // Default password if none set
+            } catch (error) {
+                console.error('Error fetching password:', error);
+                return '123456'; // Fallback to default password
+            }
+        }
+
+        loginForm.addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const password = document.getElementById('password').value;
+            const correctPassword = await getStoredPassword();
+
+            if (password === correctPassword) {
+                // Set authentication in session storage
+                sessionStorage.setItem('authenticated', 'true');
+                window.location.href = 'admin.html';
+            } else {
+                errorMessage.style.display = 'block';
+                loginForm.reset();
+            }
+        });
+    </script>
 </body>
 
 </html>

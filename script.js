@@ -45,9 +45,6 @@ async function fetchCategories() {
         if (Array.isArray(data)) {
             categories = data;
             updateCategoryDropdowns();
-            if (window.location.pathname.includes('admin.html')) {
-                displayCategoriesList();
-            }
         } else {
             console.error('Invalid categories data format');
         }
@@ -58,13 +55,10 @@ async function fetchCategories() {
 
 // Display books in the grid
 function displayBooks(booksToShow) {
-    const container = booksContainer || booksList;
-    if (!container) return;
-    
-    container.innerHTML = '';
+    booksContainer.innerHTML = '';
     booksToShow.forEach(book => {
         const bookCard = createBookCard(book);
-        container.appendChild(bookCard);
+        booksContainer.appendChild(bookCard);
     });
 }
 
@@ -93,22 +87,6 @@ function createBookCard(book) {
     return card;
 }
 
-// Display categories list in admin panel
-function displayCategoriesList() {
-    if (!categoriesList) return;
-    
-    categoriesList.innerHTML = '';
-    categories.forEach(category => {
-        const categoryItem = document.createElement('div');
-        categoryItem.className = 'category-item';
-        categoryItem.innerHTML = `
-            <span>${category.name}</span>
-            <button onclick="deleteCategory('${category.id}')" class="delete-button">حذف</button>
-        `;
-        categoriesList.appendChild(categoryItem);
-    });
-}
-
 // Update category dropdowns
 function updateCategoryDropdowns() {
     const dropdowns = [categoryFilter];
@@ -117,7 +95,6 @@ function updateCategoryDropdowns() {
     }
 
     dropdowns.forEach(dropdown => {
-        if (!dropdown) return;
         dropdown.innerHTML = '<option value="">اختر التصنيف</option>';
         categories.forEach(category => {
             const option = document.createElement('option');
@@ -130,10 +107,8 @@ function updateCategoryDropdowns() {
 
 // Search and filter functionality
 function filterBooks() {
-    const searchTerm = searchInput?.value.toLowerCase();
-    const selectedCategory = categoryFilter?.value;
-
-    if (!searchInput || !categoryFilter) return;
+    const searchTerm = searchInput.value.toLowerCase();
+    const selectedCategory = categoryFilter.value;
 
     const filteredBooks = books.filter(book => {
         const matchesSearch = book.name.toLowerCase().includes(searchTerm);
@@ -150,40 +125,45 @@ if (window.location.pathname.includes('admin.html')) {
     addBookForm?.addEventListener('submit', async (e) => {
         e.preventDefault();
         
+        // Show loading state
         const submitButton = addBookForm.querySelector('button[type="submit"]');
         const originalButtonText = submitButton.textContent;
         submitButton.textContent = 'جاري الإضافة...';
         submitButton.disabled = true;
 
         try {
-            const formData = {
-                name: document.getElementById('bookName').value,
-                price: document.getElementById('bookPrice').value,
-                quantity: document.getElementById('bookQuantity').value,
-                category: document.getElementById('bookCategory').value,
-                image: 'https://via.placeholder.com/200x300?text=No+Image' // Default image
+            const formData = new FormData(addBookForm);
+            const imageFile = formData.get('bookImage');
+            const imageUrl = await uploadImage(imageFile);
+
+            const bookData = {
+                action: 'addBook',
+                book: {
+                    name: formData.get('bookName'),
+                    price: formData.get('bookPrice'),
+                    quantity: formData.get('bookQuantity'),
+                    category: formData.get('bookCategory'),
+                    image: imageUrl
+                }
             };
 
             const response = await fetch(API_ENDPOINTS.books, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    action: 'addBook',
-                    book: formData
-                })
+                body: JSON.stringify(bookData)
             });
 
-            const result = await response.json();
-            if (result === 'success' || result?.success) {
+            const result = await response.text();
+            if (result === 'success') {
                 alert('تم إضافة الكتاب بنجاح');
                 addBookForm.reset();
                 await fetchBooks();
             } else {
-                throw new Error(result.error || 'Failed to add book');
+                throw new Error(result);
             }
         } catch (error) {
             console.error('Error adding book:', error);
-            alert(`حدث خطأ أثناء إضافة الكتاب: ${error.message}`);
+            alert('حدث خطأ أثناء إضافة الكتاب');
         } finally {
             submitButton.textContent = originalButtonText;
             submitButton.disabled = false;
@@ -194,6 +174,7 @@ if (window.location.pathname.includes('admin.html')) {
     addCategoryForm?.addEventListener('submit', async (e) => {
         e.preventDefault();
         
+        // Show loading state
         const submitButton = addCategoryForm.querySelector('button[type="submit"]');
         const originalButtonText = submitButton.textContent;
         submitButton.textContent = 'جاري الإضافة...';
@@ -210,17 +191,17 @@ if (window.location.pathname.includes('admin.html')) {
                 })
             });
 
-            const result = await response.json();
-            if (result === 'success' || result?.success) {
+            const result = await response.text();
+            if (result === 'success') {
                 alert('تم إضافة التصنيف بنجاح');
                 addCategoryForm.reset();
                 await fetchCategories();
             } else {
-                throw new Error(result.error || 'Failed to add category');
+                throw new Error(result);
             }
         } catch (error) {
             console.error('Error adding category:', error);
-            alert(`حدث خطأ أثناء إضافة التصنيف: ${error.message}`);
+            alert('حدث خطأ أثناء إضافة التصنيف');
         } finally {
             submitButton.textContent = originalButtonText;
             submitButton.disabled = false;
@@ -228,8 +209,10 @@ if (window.location.pathname.includes('admin.html')) {
     });
 
     // Delete book
-    window.deleteBook = async function(bookId) {
-        if (!confirm('هل أنت متأكد من حذف هذا الكتاب؟')) return;
+    async function deleteBook(bookId) {
+        if (!confirm('هل أنت متأكد من حذف هذا الكتاب؟')) {
+            return;
+        }
 
         try {
             const response = await fetch(API_ENDPOINTS.books, {
@@ -241,22 +224,24 @@ if (window.location.pathname.includes('admin.html')) {
                 })
             });
 
-            const result = await response.json();
-            if (result === 'success' || result?.success) {
+            const result = await response.text();
+            if (result === 'success') {
                 alert('تم حذف الكتاب بنجاح');
                 await fetchBooks();
             } else {
-                throw new Error(result.error || 'Failed to delete book');
+                throw new Error(result);
             }
         } catch (error) {
             console.error('Error deleting book:', error);
-            alert(`حدث خطأ أثناء حذف الكتاب: ${error.message}`);
+            alert('حدث خطأ أثناء حذف الكتاب');
         }
     }
 
     // Delete category
-    window.deleteCategory = async function(categoryId) {
-        if (!confirm('هل أنت متأكد من حذف هذا التصنيف؟')) return;
+    async function deleteCategory(categoryId) {
+        if (!confirm('هل أنت متأكد من حذف هذا التصنيف؟')) {
+            return;
+        }
 
         try {
             const response = await fetch(API_ENDPOINTS.categories, {
@@ -268,25 +253,62 @@ if (window.location.pathname.includes('admin.html')) {
                 })
             });
 
-            const result = await response.json();
-            if (result === 'success' || result?.success) {
+            const result = await response.text();
+            if (result === 'success') {
                 alert('تم حذف التصنيف بنجاح');
                 await fetchCategories();
             } else {
-                throw new Error(result.error || 'Failed to delete category');
+                throw new Error(result);
             }
         } catch (error) {
             console.error('Error deleting category:', error);
-            alert(`حدث خطأ أثناء حذف التصنيف: ${error.message}`);
+            alert('حدث خطأ أثناء حذف التصنيف');
+        }
+    }
+
+    // Helper function to upload images
+    async function uploadImage(file) {
+        if (!file) {
+            throw new Error('No file provided');
+        }
+
+        const formData = new FormData();
+        formData.append('action', 'uploadImage');
+        formData.append('image', file);
+
+        try {
+            const response = await fetch(API_ENDPOINTS.books, {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.text();
+            if (result.startsWith('http')) {
+                return result; // Return the image URL
+            } else {
+                throw new Error(result);
+            }
+        } catch (error) {
+            console.error('Error uploading image:', error);
+            throw error;
         }
     }
 }
 
-// Password management
+// Event listeners
+searchInput?.addEventListener('input', filterBooks);
+categoryFilter?.addEventListener('change', filterBooks);
+
+// Password management functions
+
+const PASSWORD_API_URL = 'https://script.google.com/macros/s/AKfycbzkt3glLvLeT4b9PxZEmOBQdR9ZJLZZWPHJZVXCAQm5NBMvIxWjJuF07b3cl0eVPLgYhw/exec';
+
+// Get password from Google Apps Script (GET)
 async function getStoredPassword() {
     try {
-        const response = await fetch(`${API_ENDPOINTS.password}?action=getPassword`);
+        const response = await fetch(PASSWORD_API_URL);
         const data = await response.json();
+        // Expecting { password: "..." }
         return data.password || '123456';
     } catch (error) {
         console.error('Error fetching password:', error);
@@ -294,19 +316,16 @@ async function getStoredPassword() {
     }
 }
 
+// Update password via Google Apps Script (POST)
 async function updatePassword(currentPassword, newPassword) {
     try {
-        const response = await fetch(API_ENDPOINTS.password, {
+        const response = await fetch(PASSWORD_API_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                action: 'updatePassword',
-                current: currentPassword,
-                new: newPassword
-            })
+            body: JSON.stringify({ current: currentPassword, new: newPassword })
         });
-        const result = await response.json();
-        return result === 'success' || result?.success;
+        const result = await response.text();
+        return result === 'success';
     } catch (error) {
         console.error('Error updating password:', error);
         return false;
@@ -324,9 +343,11 @@ if (document.getElementById('changePasswordForm')) {
         const currentPassword = document.getElementById('currentPassword').value;
         const newPassword = document.getElementById('newPassword').value;
 
+        // Hide any previous messages
         successMessage.style.display = 'none';
         errorMessage.style.display = 'none';
 
+        // Update password via API
         const updated = await updatePassword(currentPassword, newPassword);
         if (updated) {
             successMessage.style.display = 'block';
@@ -338,32 +359,6 @@ if (document.getElementById('changePasswordForm')) {
     });
 }
 
-// Login form handler
-if (document.getElementById('loginForm')) {
-    const loginForm = document.getElementById('loginForm');
-    const errorMessage = document.getElementById('errorMessage');
-
-    if (sessionStorage.getItem('authenticated') === 'true') {
-        window.location.href = 'admin.html';
-    }
-
-    loginForm.addEventListener('submit', async function(e) {
-        e.preventDefault();
-        const password = document.getElementById('password').value;
-        const correctPassword = await getStoredPassword();
-
-        if (password === correctPassword) {
-            sessionStorage.setItem('authenticated', 'true');
-            window.location.href = 'admin.html';
-        } else {
-            errorMessage.style.display = 'block';
-            loginForm.reset();
-        }
-    });
-}
-
 // Initial load
-document.addEventListener('DOMContentLoaded', () => {
-    fetchBooks();
-    fetchCategories();
-});
+fetchBooks();
+fetchCategories();
