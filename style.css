@@ -1,150 +1,61 @@
-:root {
-    --color-grey-light: #ccc1c1;
-    --color-grey-dark: #666;
-    --color-beige: #f5f2ee;
-    --color-primary: #4a4a4a;
+/* Admin Specific Styles */
+.admin-book-card {
+    position: relative;
 }
 
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-
-body {
-    font-family: 'Cairo', sans-serif;
-    background-color: var(--color-beige);
-    color: var(--color-primary);
-    line-height: 1.6;
-}
-
-.container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 0 20px;
-}
-
-/* Header Styles */
-header {
-    background-color: var(--color-grey-light );
-    padding: 2rem 0;
-    text-align: center;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-h1 {
-    font-size: 2.5rem;
-    margin-bottom: 0.5rem;
-}
-
-.subtitle {
-    color: var(--color-grey-dark);
-    margin-bottom: 1rem;
-}
-
-/* Search and Filter Styles */
-.search-filter {
+.book-actions {
     display: flex;
-    gap: 1rem;
-    margin: 2rem 0;
+    gap: 0.5rem;
+    margin-top: 1rem;
 }
 
-#searchInput, #categoryFilter {
-    padding: 0.5rem 1rem;
-    border: 1px solid var(--color-grey-dark);
-    border-radius: 4px;
-    font-family: 'Cairo', sans-serif;
+.edit-button {
+    background-color: #007bff;
 }
 
-#searchInput {
-    flex: 1;
+.edit-button:hover {
+    background-color: #0069d9;
 }
 
-/* Books Grid */
-.books-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-    gap: 2rem;
-    padding: 2rem 0;
+.delete-button {
+    background-color: #dc3545;
 }
 
-.book-card {
-    background: white;
-    border-radius: 8px;
-    overflow: hidden;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    transition: transform 0.2s;
+.delete-button:hover {
+    background-color: #c82333;
 }
 
-.book-card:hover {
-    transform: translateY(-5px);
+/* Form Styles */
+.admin-page .form-group {
+    margin-bottom: 1.5rem;
 }
 
-.book-image {
-    width: 100%;
-    height: 250px;
-    object-fit: cover;
-}
-
-.book-info {
-    padding: 1rem;
-}
-
-.book-title {
-    font-size: 1.2rem;
+.admin-page label {
+    font-weight: 600;
     margin-bottom: 0.5rem;
 }
 
-.book-price, .book-quantity {
-    color: var(--color-grey-dark);
-}
-
-.no-books {
-    text-align: center;
-    padding: 20px;
-    grid-column: 1 / -1;
-    color: var(--color-grey-dark);
-}
-
-/* Footer Styles */
-footer {
-    background-color: var(--color-grey-light);
-    padding: 2rem 0;
-    margin-top: 4rem;
-}
-
-.contact-info {
-    text-align: center;
-    color: var(--color-grey-dark);
-}
-
-/* Alert Styles */
-.alert {
-    padding: 15px;
-    margin-bottom: 20px;
-    border: 1px solid transparent;
+.admin-page input,
+.admin-page select {
+    padding: 0.75rem;
+    border: 1px solid #ddd;
     border-radius: 4px;
+    font-size: 1rem;
 }
 
-.alert-success {
-    color: #3c763d;
-    background-color: #dff0d8;
-    border-color: #d6e9c6;
+.admin-page button {
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
+    font-weight: 600;
 }
 
-.alert-error {
-    color: #a94442;
-    background-color: #f2dede;
-    border-color: #ebccd1;
-}
-
-/* Responsive Design */
+/* Responsive Admin */
 @media (max-width: 768px) {
-    .search-filter {
-        flex-direction: column;
+    .admin-page .container {
+        padding: 0 15px;
     }
     
-    .books-grid {
-        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    .admin-page section {
+        padding: 1.5rem;
     }
 }
